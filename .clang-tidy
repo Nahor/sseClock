@@ -1,0 +1,22 @@
+Checks: >
+    clang-diagnostic-*,
+    clang-analyzer-*,
+    bugprone-*,
+    concurrency-*,
+    cppcoreguidelines-*,
+    google-*,
+    misc-*,
+    modernize-*,
+    performance-*,
+    portability-*,
+    readability-*,
+
+    -cppcoreguidelines-avoid-magic-numbers,
+    -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    -cppcoreguidelines-pro-type-union-access,
+    -cppcoreguidelines-pro-type-vararg,
+    -modernize-use-nodiscard,
+    -modernize-use-trailing-return-type,
+    -readability-magic-numbers,
+    -readability-redundant-access-specifiers,
+    -readability-uppercase-literal-suffix

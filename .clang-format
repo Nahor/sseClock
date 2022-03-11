@@ -1,0 +1,20 @@
+Language:        Cpp
+BasedOnStyle:  Google
+
+AccessModifierOffset: -3
+AlignAfterOpenBracket: DontAlign
+AlignOperands:   false
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+BreakBeforeBinaryOperators: NonAssignment
+BreakConstructorInitializersBeforeComma: true
+BreakStringLiterals: false
+ColumnLimit:     0
+ContinuationIndentWidth:  8
+IncludeBlocks:   Preserve
+IndentPPDirectives: AfterHash
+IndentWidth:     4
+PointerAlignment: Right
+Standard:        Latest
+TabWidth:        4
