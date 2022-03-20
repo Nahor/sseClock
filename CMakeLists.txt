@@ -19,6 +19,7 @@ FetchContent_Declare(fmt
     UPDATE_DISCONNECTED ON
     )
 FetchContent_MakeAvailable(fmt)
+target_compile_definitions(fmt INTERFACE FMT_STRING)
 
 FetchContent_Declare(nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
@@ -78,7 +79,8 @@ FetchContent_Declare(cpr
 FetchContent_MakeAvailable(cpr)
 
 add_executable(sseClock main.cpp)
-target_link_libraries(sseClock -static -mwindows)
+target_link_libraries(sseClock -static)
+target_link_libraries(sseClock -mwindows)
 target_link_libraries(sseClock cpr  nlohmann_json::nlohmann_json fmt::fmt)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
