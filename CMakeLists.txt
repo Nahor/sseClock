@@ -80,7 +80,6 @@ FetchContent_MakeAvailable(cpr)
 
 add_executable(sseClock main.cpp)
 target_link_libraries(sseClock -static)
-target_link_libraries(sseClock -mwindows)
 target_link_libraries(sseClock cpr  nlohmann_json::nlohmann_json fmt::fmt)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
