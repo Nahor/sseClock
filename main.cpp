@@ -86,7 +86,11 @@ class SseClock {
     enum class Status {
         OK,
         TEMPORARY,
-        PERMANENT
+        // Remove PERMANENT errors for now. With up to 5 min delay between
+        // requests, we won't big flooding the logs or use a lot of CPU if we
+        // keep trying anyway, and it allows for recovering if the error is
+        // really a temporary bad state in SSE
+        // PERMANENT
     };
 
  public:
@@ -139,11 +143,15 @@ class SseClock {
         logPrint("   Content-type: {}\n", r.header["content-type"]);
         logPrint("   Body: {} \n", r.text);
 
-        nlohmann::json response_body = nlohmann::json::parse(r.text);
-        if (response_body.contains("error") && (response_body["error"] == kErrorTooManyRegistration)) {
-            return Status::TEMPORARY;
+        try {
+            nlohmann::json response_body = nlohmann::json::parse(r.text);
+            if (response_body.contains("error") && (response_body["error"] == kErrorTooManyRegistration)) {
+                return Status::TEMPORARY;
+            }
+        } catch (const nlohmann::json::exception &e) {
+            logPrint("JSON exception: {}\n", e.what());
         }
-        return Status::PERMANENT;
+        return Status::TEMPORARY;  // PERMANENT;
     }
 
     Status init() {
@@ -234,6 +242,19 @@ class SseClock {
                         }},
         };
         return sendRequest("/game_event", eventData);
+    }
+
+    template <auto T, typename... Args>
+    Status checked(Args &&...args) {
+        try {
+            return (this->*T)(std::forward<Args>(args)...);
+        } catch (const std::exception &e) {
+            logPrint("Exception {}: {}\n", typeid(e).name(), e.what());
+            return Status::TEMPORARY;  // PERMANENT;
+        } catch (...) {
+            logPrint("Unknown exception\n");
+            return Status::TEMPORARY;  // PERMANENT;
+        }
     }
 
  private:
@@ -339,9 +360,12 @@ int main(int /*argc*/, char * /*argv*/[]) {
     while ((!quit) && (state != Stopping)) {
         switch (state) {
             case Registering:
-                switch (clock.init()) {
+                switch (clock.checked<&SseClock::init>()) {
                     case SseClock::Status::OK:
-                        delay = {};
+                        // Don't reset the delay just yet. Wait until we have
+                        // at least on successful update so that we don't flood
+                        // the logs if the registration always succeeds but the
+                        // update always fails.
                         state = Updating;
                         logPrint("Registration complete\n");
                         break;
@@ -349,18 +373,19 @@ int main(int /*argc*/, char * /*argv*/[]) {
                         delay = std::min(std::max(std::chrono::seconds{1}, delay * 2), kMaxDelay);
                         state = Delaying;
                         break;
-                    case SseClock::Status::PERMANENT:
-                        state = Stopping;
-                        break;
+                        // case SseClock::Status::PERMANENT:
+                        //     state = Stopping;
+                        //     break;
                 }
                 break;
             case Updating:
-                switch (clock.send_event()) {
+                switch (clock.checked<&SseClock::send_event>()) {
                     case SseClock::Status::OK:
+                        delay = {};
                         state = Waiting;
                         break;
                     case SseClock::Status::TEMPORARY:
-                    case SseClock::Status::PERMANENT:
+                        // case SseClock::Status::PERMANENT:
                         state = Registering;
                         break;
                 }

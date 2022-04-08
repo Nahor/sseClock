@@ -21,6 +21,8 @@ FetchContent_Declare(fmt
 FetchContent_MakeAvailable(fmt)
 target_compile_definitions(fmt INTERFACE FMT_STRING)
 
+set(JSON_Diagnostics ON CACHE INTERNAL "")
+set(JSON_SystemInclude ON CACHE INTERNAL "")
 FetchContent_Declare(nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.10.5
