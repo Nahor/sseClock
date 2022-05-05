@@ -2,5 +2,6 @@
     "cSpell.words": [
         "nlohmann",
         "NOLINTNEXTLINE"
-    ]
+    ],
+    "cmake.generator": "Ninja"
 }
