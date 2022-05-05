@@ -57,9 +57,9 @@ void logPrint(Args &&...args) {
     std::filesystem::path log_path = tmpPath;
     log_path.append(kLogRpath);
     log_path = log_path.lexically_normal().make_preferred();
-    std::error_code ec;
+    std::error_code err_code;
 
-    if (std::filesystem::exists(log_path, ec) && std::filesystem::file_size(log_path, ec) > kMaxLogSize) {
+    if (std::filesystem::exists(log_path, err_code) && std::filesystem::file_size(log_path, err_code) > kMaxLogSize) {
         {
             fmt::ostream log_stream = fmt::output_file(log_path.string(), fmt::file::APPEND | fmt::file::WRONLY);
             log_stream.print("{} - Log end\n", std::chrono::system_clock::now());
@@ -69,10 +69,10 @@ void logPrint(Args &&...args) {
         log_path_bak.append(kLogRpathBak);
         log_path_bak = log_path_bak.lexically_normal().make_preferred();
 
-        std::filesystem::rename(log_path, log_path_bak, ec);
+        std::filesystem::rename(log_path, log_path_bak, err_code);
     }
 
-    if (!std::filesystem::exists(log_path, ec)) {
+    if (!std::filesystem::exists(log_path, err_code)) {
         fmt::ostream log_stream = fmt::output_file(log_path.string(), fmt::file::CREATE | fmt::file::WRONLY);
         log_stream.print("{} - Log start\n", std::chrono::system_clock::now());
     }
@@ -101,10 +101,14 @@ class SseClock {
         sse_prop_file.append(SsePropRpath);
         sse_prop_file = sse_prop_file.lexically_normal().make_preferred();
 
-        nlohmann::json sse_prop;
-        std::ifstream{sse_prop_file} >> sse_prop;
-
-        sse_address_ = "http://" + sse_prop["address"].get<std::string>();
+        try {
+            nlohmann::json sse_prop;
+            std::ifstream{sse_prop_file} >> sse_prop;
+            sse_address_ = "http://" + sse_prop["address"].get<std::string>();
+        } catch (const nlohmann::json::exception &e) {
+            logPrint("JSON exception in address file: {}\n", e.what());
+            return false;
+        }
 
         if (sse_address_ != prev_address_) {
             logPrint("Using address: {}\n", sse_address_);
@@ -115,19 +119,19 @@ class SseClock {
     }
 
     Status sendRequest(const char *path, const nlohmann::json &body, bool silent = false) {
-        cpr::Response r = cpr::Post(
+        cpr::Response response = cpr::Post(
                 cpr::Url{sse_address_ + path},
                 cpr::Header{{"Content-Type", "application/json"}},
                 cpr::Body(body.dump()),
                 cpr::Timeout{500});
-        if (r.error.code != cpr::ErrorCode::OK) {
+        if (response.error.code != cpr::ErrorCode::OK) {
             if (!silent) {
-                logPrint("Error: {} - {}\n", static_cast<int>(r.error.code), r.error.message);
+                logPrint("Error: {} - {}\n", static_cast<int>(response.error.code), response.error.message);
             }
             return Status::TEMPORARY;
         }
 
-        if (r.status_code == 200) {
+        if (response.status_code == 200) {
             return Status::OK;
         }
 
@@ -139,17 +143,17 @@ class SseClock {
 
         // Log the error and delay the next request
         logPrint("Url: {}\n", (sse_address_ + path));
-        logPrint("   Status code: {} - {}\n", r.status_code, r.status_line);
-        logPrint("   Content-type: {}\n", r.header["content-type"]);
-        logPrint("   Body: {} \n", r.text);
+        logPrint("   Status code: {} - {}\n", response.status_code, response.status_line);
+        logPrint("   Content-type: {}\n", response.header["content-type"]);
+        logPrint("   Body: {} \n", response.text);
 
         try {
-            nlohmann::json response_body = nlohmann::json::parse(r.text);
+            nlohmann::json response_body = nlohmann::json::parse(response.text);
             if (response_body.contains("error") && (response_body["error"] == kErrorTooManyRegistration)) {
                 return Status::TEMPORARY;
             }
         } catch (const nlohmann::json::exception &e) {
-            logPrint("JSON exception: {}\n", e.what());
+            logPrint("JSON exception in request:\n\t{}\nin body:\n", e.what(), response.text);
         }
         return Status::TEMPORARY;  // PERMANENT;
     }
