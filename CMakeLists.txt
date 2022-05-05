@@ -75,14 +75,14 @@ set(CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG ON CACHE INTERNAL "")
 set(CPR_ENABLE_SSL OFF)
 FetchContent_Declare(cpr
     GIT_REPOSITORY https://github.com/libcpr/cpr.git
-    GIT_TAG 1.7.2
+    GIT_TAG 1.8.2
     UPDATE_DISCONNECTED ON
     )
 FetchContent_MakeAvailable(cpr)
 
 add_executable(sseClock main.cpp)
 target_link_libraries(sseClock -static)
-target_link_libraries(sseClock cpr  nlohmann_json::nlohmann_json fmt::fmt)
+target_link_libraries(sseClock cpr nlohmann_json::nlohmann_json fmt::fmt)
 
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
