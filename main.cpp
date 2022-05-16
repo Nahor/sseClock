@@ -1,8 +1,13 @@
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+#define NOMINMAX
+
 #include <cpr/cpr.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/os.h>
 #include <chrono>
+#include <codecvt>
+#include <csignal>
 #include <exception>
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -210,37 +215,45 @@ class SseClock {
     }
 
     Status send_event() {
-        SYSTEMTIME date;
-        GetSystemTime(&date);
-        SYSTEMTIME time;
-        GetLocalTime(&time);
+        std::string date_str;
+        {
+            SYSTEMTIME date;
+            GetSystemTime(&date);
+            std::array<wchar_t, 256> date_wstr{};
+            GetDateFormatEx(LOCALE_NAME_USER_DEFAULT,
+                    DATE_AUTOLAYOUT | DATE_SHORTDATE,
+                    &date,
+                    nullptr,
+                    date_wstr.data(),
+                    date_wstr.size(),
+                    nullptr);
+            date_str = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(date_wstr.data());
+        }
 
-        std::array<wchar_t, 256> date_str{};
-        GetDateFormatEx(LOCALE_NAME_USER_DEFAULT,
-                DATE_AUTOLAYOUT | DATE_SHORTDATE,
-                &date,
-                nullptr,
-                date_str.data(),
-                date_str.size(),
-                nullptr);
-        std::array<wchar_t, 256> time_str{};
-        GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT,
-                0,
-                &time,
-                nullptr,
-                time_str.data(),
-                time_str.size());
+        std::string time_str;
+        {
+            SYSTEMTIME time;
+            GetLocalTime(&time);
+            std::array<wchar_t, 256> time_wstr{};
+            GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT,
+                    0,
+                    &time,
+                    nullptr,
+                    time_wstr.data(),
+                    time_wstr.size());
+            time_str = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(time_wstr.data());
+        }
 
         nlohmann::json eventData = {
                 {"game", kSseAppId},
                 {"event", kSseEventId},
                 {"data",
                         {
-                                {"value", time_str.data()},
+                                {"value", time_str},
                                 {"frame",
                                         {
-                                                {"date", date_str.data()},
-                                                {"time", time_str.data()},
+                                                {"date", date_str},
+                                                {"time", time_str},
                                         }},
 
                         }},
@@ -267,7 +280,7 @@ class SseClock {
 };
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-static bool quit = false;
+static volatile bool quit = false;
 
 void signalHandler(int /*signum*/) {
     quit = true;
