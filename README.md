@@ -1,6 +1,8 @@
 # sseClock
 
-Simple application for SteelSeries devices to show the current date and time.
+Simple application for SteelSeries with OLED/LED display to show the current
+date and time.
+![Screenshot](/img/screenshot.jpg)
 
 ## Build/Compilation
 
