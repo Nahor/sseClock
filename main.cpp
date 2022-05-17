@@ -22,7 +22,12 @@ static constexpr const char *kSseAppId = "CLOCK_DISPLAY";
 static constexpr const char *kSseDisplayName = "Clock Display";
 static constexpr const char *kSseEventId = "CLOCK";
 
-static constexpr std::chrono::seconds kMaxDelay = std::chrono::minutes{5};
+static constexpr const char *kAddrError = "<addr error>";
+
+static constexpr std::chrono::seconds kMaxRetryDelay = std::chrono::minutes{1};
+static constexpr std::chrono::seconds kMinAddressAge = std::chrono::seconds{3};
+static constexpr std::chrono::seconds kSpamDelay = std::chrono::seconds{320};
+static const auto kAncientDate = std::chrono::steady_clock::now() - std::chrono::hours();
 
 //  Most of the requests require specifying both the game and event in question.
 // This error is returned if one is missing. This error will also be returned if
@@ -90,37 +95,67 @@ class SseClock {
  public:
     enum class Status {
         OK,
-        TEMPORARY,
-        // Remove PERMANENT errors for now. With up to 5 min delay between
-        // requests, we won't big flooding the logs or use a lot of CPU if we
-        // keep trying anyway, and it allows for recovering if the error is
-        // really a temporary bad state in SSE
-        // PERMANENT
+        SPAM,  // SSE is blocking because of its anti-spam filter
+        OTHER,
     };
 
  public:
-    // Returns true if the address changed
-    bool checkAddress() {
+    static std::filesystem::path getAddressFile() {
         // NOLINTNEXTLINE(concurrency-mt-unsafe)
         std::filesystem::path sse_prop_file = std::getenv("ProgramData");
         sse_prop_file.append(SsePropRpath);
         sse_prop_file = sse_prop_file.lexically_normal().make_preferred();
 
+        return sse_prop_file;
+    }
+
+    // Returns true if the address changed
+    bool checkAddress() {
+        std::filesystem::path sse_prop_file = getAddressFile();
+
+        std::string new_addr;
         try {
             nlohmann::json sse_prop;
             std::ifstream{sse_prop_file} >> sse_prop;
-            sse_address_ = "http://" + sse_prop["address"].get<std::string>();
+            new_addr = "http://" + sse_prop["address"].get<std::string>();
         } catch (const nlohmann::json::exception &e) {
-            logPrint("JSON exception in address file: {}\n", e.what());
+            if (sse_address_ != kAddrError) {
+                logPrint("JSON exception in address file: {}\n", e.what());
+                sse_address_ = kAddrError;
+            }
             return false;
         }
 
-        if (sse_address_ != prev_address_) {
+        if (sse_address_ != new_addr) {
             logPrint("Using address: {}\n", sse_address_);
-            prev_address_ = sse_address_;
+            sse_address_ = new_addr;
             return true;
         }
         return false;
+    }
+
+    // Returns the last-modified date of the address file (to figure out how
+    // long ago SSE was started)
+    static std::chrono::steady_clock::time_point getAddressAge() {
+        std::filesystem::path sse_prop_file = getAddressFile();
+        std::filesystem::file_time_type last_modified = std::filesystem::last_write_time(sse_prop_file);
+
+        // Reference clocks. We need to have constants so that calling
+        // getAddressAge multiple time always gives the same result. Without
+        // constants, the resulting age would vary by a few ns/us/ms each time
+        static const auto file_ref = std::filesystem::file_time_type::clock::now();
+        static const auto steady_ref = std::chrono::steady_clock::now();
+
+        auto age_date = last_modified - file_ref + steady_ref;
+        if (age_date > std::chrono::steady_clock::now()) {
+            // File was modified at a future date, we can't estimate its age so
+            // return something "old"
+            auto future = age_date - std::chrono::steady_clock::now();
+            logPrint("Address file has a future date ({})", std::chrono::system_clock::now() + future);
+            age_date = kAncientDate;
+        }
+
+        return age_date;
     }
 
     Status sendRequest(const char *path, const nlohmann::json &body, bool silent = false) {
@@ -131,9 +166,9 @@ class SseClock {
                 cpr::Timeout{500});
         if (response.error.code != cpr::ErrorCode::OK) {
             if (!silent) {
-                logPrint("Error: {} - {}\n", static_cast<int>(response.error.code), response.error.message);
+                logPrint("Error[{}]: {} - {}\n", path, static_cast<int>(response.error.code), response.error.message);
             }
-            return Status::TEMPORARY;
+            return Status::OTHER;
         }
 
         if (response.status_code == 200) {
@@ -155,15 +190,17 @@ class SseClock {
         try {
             nlohmann::json response_body = nlohmann::json::parse(response.text);
             if (response_body.contains("error") && (response_body["error"] == kErrorTooManyRegistration)) {
-                return Status::TEMPORARY;
+                return Status::SPAM;
             }
         } catch (const nlohmann::json::exception &e) {
             logPrint("JSON exception in request:\n\t{}\nin body:\n", e.what(), response.text);
         }
-        return Status::TEMPORARY;  // PERMANENT;
+        return Status::OTHER;
     }
 
     Status init() {
+        // Remove the game (this is in case we updated the app and changed the
+        // game/event metadata)
         remove();
 
         nlohmann::json metadata = {
@@ -267,16 +304,15 @@ class SseClock {
             return (this->*T)(std::forward<Args>(args)...);
         } catch (const std::exception &e) {
             logPrint("Exception {}: {}\n", typeid(e).name(), e.what());
-            return Status::TEMPORARY;  // PERMANENT;
+            return Status::OTHER;
         } catch (...) {
             logPrint("Unknown exception\n");
-            return Status::TEMPORARY;  // PERMANENT;
+            return Status::OTHER;
         }
     }
 
  private:
     std::string sse_address_{};
-    std::string prev_address_{};
 };
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
@@ -331,6 +367,7 @@ BOOL ctrlHandler(DWORD fdwCtrlType) {
     }
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int main(int /*argc*/, char * /*argv*/[]) {
     std::set_terminate([]() {
         terminateHandler();
@@ -363,19 +400,65 @@ int main(int /*argc*/, char * /*argv*/[]) {
     fmt::print("Logging to {}\n", tmpPath);
 
     SseClock clock;
-    clock.checkAddress();
 
     enum {
-        Registering,  // Need to connect to SSE next
-        Updating,     // Need to update the SSE event
-        Waiting,      // Waiting for the next update
-        Delaying,     // Something went wrong but we need to wait before retrying
+        DelayedStart,  // SSE doesn't like an app starting while it is still
+                       // initializing, so if the address file is very new,
+                       // we'll want to wait a bit
+        Registering,   // Need to connect to SSE next
+        Updating,      // Need to update the SSE event
+        Waiting,       // Waiting for the next update
+        Delaying,      // Something went wrong but we need to wait before retrying
+        Spam,          // SSE is blocking because of "spam", we need to wait 5min
         Stopping,
-    } state{Registering};
-    std::chrono::steady_clock::time_point next_request{};
+    } state{Delaying};  // Starting with an "infinite" delay to wait for a valid address
+    std::chrono::steady_clock::time_point next_request{std::chrono::steady_clock::time_point::max()};
     std::chrono::seconds delay{};
+    std::chrono::steady_clock::time_point delayed_start_logged{};
+
+    auto resetDelay = [&]() {
+        delay = {};
+        // The delay can be reset "early" (e.g. because a change of address),
+        // and thus the next_request timepoint may be pointing to a time still
+        // in the future, so we also need to reset that.
+        next_request = std::chrono::steady_clock::now();
+    };
+
     while ((!quit) && (state != Stopping)) {
         switch (state) {
+            // Spam and DelayedStart are identical except for how old the
+            // address file must be
+            case Spam:
+            case DelayedStart: {
+                auto minAge = (state == Spam)
+                        ? kSpamDelay
+                        : kMinAddressAge;
+                std::chrono::steady_clock::time_point age_date = SseClock::getAddressAge();
+                std::chrono::duration age = std::chrono::steady_clock::now() - age_date;
+                if (age >= minAge) {
+                    // The file is "old", we can continue
+                    state = Registering;
+
+                    // Reset in case we have another delay later even later even
+                    // when file doesn't change (e.g. switching from
+                    // kMinAddressAge to kSpamDelay)
+                    delayed_start_logged = {};
+                    break;
+                }
+
+                // The file is too young (i.e. SSE is probably still
+                // initializing) => wait a bit
+                if (delayed_start_logged != age_date) {
+                    logPrint("Delaying start for {} (@{:%H:%M:%S})\n",
+                            std::chrono::duration_cast<std::chrono::seconds>(minAge - age),
+                            (std::chrono::system_clock::now() + (minAge - age)));
+                    delayed_start_logged = age_date;
+                }
+                // Wait 1s only, so that in the meantime, we can still detect
+                // to quit the app
+                std::this_thread::sleep_for(std::chrono::seconds{1});
+                break;
+            }
             case Registering:
                 switch (clock.checked<&SseClock::init>()) {
                     case SseClock::Status::OK:
@@ -386,23 +469,25 @@ int main(int /*argc*/, char * /*argv*/[]) {
                         state = Updating;
                         logPrint("Registration complete\n");
                         break;
-                    case SseClock::Status::TEMPORARY:
-                        delay = std::min(std::max(std::chrono::seconds{1}, delay * 2), kMaxDelay);
+                    case SseClock::Status::SPAM:
+                        state = Spam;
+                        break;
+                    case SseClock::Status::OTHER:
+                        delay = std::min(std::max(std::chrono::seconds{1}, delay * 2), kMaxRetryDelay);
                         state = Delaying;
                         break;
-                        // case SseClock::Status::PERMANENT:
-                        //     state = Stopping;
-                        //     break;
                 }
                 break;
             case Updating:
                 switch (clock.checked<&SseClock::send_event>()) {
                     case SseClock::Status::OK:
-                        delay = {};
+                        resetDelay();
                         state = Waiting;
                         break;
-                    case SseClock::Status::TEMPORARY:
-                        // case SseClock::Status::PERMANENT:
+                    case SseClock::Status::SPAM:
+                        state = Spam;
+                        break;
+                    case SseClock::Status::OTHER:
                         state = Registering;
                         break;
                 }
@@ -427,11 +512,11 @@ int main(int /*argc*/, char * /*argv*/[]) {
 
                 if (clock.checkAddress()) {
                     // The address changed, SSE was restarted so reset the delay
-                    delay = {};
-                    state = Registering;
+                    resetDelay();
+                    state = DelayedStart;
                 } else {
                     state = ((next_request <= std::chrono::steady_clock::now())
-                                    ? Registering
+                                    ? DelayedStart
                                     : Delaying);
                 }
 
