@@ -1,7 +1,15 @@
 {
     "cSpell.words": [
+        "chrono",
+        "cppcoreguidelines",
+        "datas",
+        "DATE_AUTOLAYOUT",
+        "DATE_SHORTDATE",
         "nlohmann",
-        "NOLINTNEXTLINE"
+        "NOLINTNEXTLINE",
+        "NOMINMAX",
+        "nullopt_t",
+        "timepoint"
     ],
     "cmake.generator": "Ninja"
 }

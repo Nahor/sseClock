@@ -11,6 +11,7 @@
 #include <exception>
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <thread>  // for std::this_thread::sleep_until
 
 static constexpr const char *kLogRpath = "./sseClock.log";
@@ -24,10 +25,10 @@ static constexpr const char *kSseEventId = "CLOCK";
 
 static constexpr const char *kAddrError = "<addr error>";
 
-static constexpr std::chrono::seconds kMaxRetryDelay = std::chrono::minutes{1};
+static constexpr std::chrono::seconds kMaxRetryDelay = std::chrono::minutes{5};
 static constexpr std::chrono::seconds kMinAddressAge = std::chrono::seconds{3};
 static constexpr std::chrono::seconds kSpamDelay = std::chrono::seconds{320};
-static const auto kAncientDate = std::chrono::steady_clock::now() - std::chrono::hours();
+static const auto kAncientDate = std::chrono::steady_clock::now() - std::chrono::hours{1};
 
 //  Most of the requests require specifying both the game and event in question.
 // This error is returned if one is missing. This error will also be returned if
@@ -136,9 +137,14 @@ class SseClock {
 
     // Returns the last-modified date of the address file (to figure out how
     // long ago SSE was started)
-    static std::chrono::steady_clock::time_point getAddressAge() {
+    static std::optional<std::chrono::steady_clock::time_point> getAddressAge() {
         std::filesystem::path sse_prop_file = getAddressFile();
-        std::filesystem::file_time_type last_modified = std::filesystem::last_write_time(sse_prop_file);
+        std::error_code err{};
+        std::filesystem::file_time_type last_modified = std::filesystem::last_write_time(sse_prop_file, err);
+        if (err) {
+            logPrint("Error getting age of address file: {} - {}\n", err.value(), err.message());
+            return {};
+        }
 
         // Reference clocks. We need to have constants so that calling
         // getAddressAge multiple time always gives the same result. Without
@@ -425,108 +431,119 @@ int main(int /*argc*/, char * /*argv*/[]) {
     };
 
     while ((!quit) && (state != Stopping)) {
-        switch (state) {
-            // Spam and DelayedStart are identical except for how old the
-            // address file must be
-            case Spam:
-            case DelayedStart: {
-                auto minAge = (state == Spam)
-                        ? kSpamDelay
-                        : kMinAddressAge;
-                std::chrono::steady_clock::time_point age_date = SseClock::getAddressAge();
-                std::chrono::duration age = std::chrono::steady_clock::now() - age_date;
-                if (age >= minAge) {
-                    // The file is "old", we can continue
-                    state = Registering;
-
-                    // Reset in case we have another delay later even later even
-                    // when file doesn't change (e.g. switching from
-                    // kMinAddressAge to kSpamDelay)
-                    delayed_start_logged = {};
-                    break;
-                }
-
-                // The file is too young (i.e. SSE is probably still
-                // initializing) => wait a bit
-                if (delayed_start_logged != age_date) {
-                    logPrint("Delaying start for {} (@{:%H:%M:%S})\n",
-                            std::chrono::duration_cast<std::chrono::seconds>(minAge - age),
-                            (std::chrono::system_clock::now() + (minAge - age)));
-                    delayed_start_logged = age_date;
-                }
-                // Wait 1s only, so that in the meantime, we can still detect
-                // to quit the app
-                std::this_thread::sleep_for(std::chrono::seconds{1});
-                break;
-            }
-            case Registering:
-                switch (clock.checked<&SseClock::init>()) {
-                    case SseClock::Status::OK:
-                        // Don't reset the delay just yet. Wait until we have
-                        // at least on successful update so that we don't flood
-                        // the logs if the registration always succeeds but the
-                        // update always fails.
-                        state = Updating;
-                        logPrint("Registration complete\n");
-                        break;
-                    case SseClock::Status::SPAM:
-                        state = Spam;
-                        break;
-                    case SseClock::Status::OTHER:
+        try {
+            switch (state) {
+                // Spam and DelayedStart are identical except for how old the
+                // address file must be
+                case Spam:
+                case DelayedStart: {
+                    auto minAge = (state == Spam)
+                            ? kSpamDelay
+                            : kMinAddressAge;
+                    auto age_date = SseClock::getAddressAge();
+                    if (!age_date) {
                         delay = std::min(std::max(std::chrono::seconds{1}, delay * 2), kMaxRetryDelay);
                         state = Delaying;
-                        break;
+                    } else {
+                        std::chrono::duration age = std::chrono::steady_clock::now() - age_date.value();
+                        if (age >= minAge) {
+                            // The file is "old", we can continue
+                            state = Registering;
+
+                            // Reset in case we have another delay later even later even
+                            // when file doesn't change (e.g. switching from
+                            // kMinAddressAge to kSpamDelay)
+                            delayed_start_logged = {};
+                            break;
+                        }
+
+                        // The file is too young (i.e. SSE is probably still
+                        // initializing) => wait a bit
+                        if (delayed_start_logged != age_date.value()) {
+                            logPrint("Delaying start by {} (@{:%H:%M:%S})\n",
+                                    std::chrono::duration_cast<std::chrono::seconds>(minAge - age),
+                                    (std::chrono::system_clock::now() + (minAge - age)));
+                            delayed_start_logged = age_date.value();
+                        }
+                        // Wait 1s only, so that in the meantime, we can still detect
+                        // to quit the app
+                        std::this_thread::sleep_for(std::chrono::seconds{1});
+                    }
+                    break;
                 }
-                break;
-            case Updating:
-                switch (clock.checked<&SseClock::send_event>()) {
-                    case SseClock::Status::OK:
+                case Registering:
+                    switch (clock.checked<&SseClock::init>()) {
+                        case SseClock::Status::OK:
+                            // Don't reset the delay just yet. Wait until we have
+                            // at least on successful update so that we don't flood
+                            // the logs if the registration always succeeds but the
+                            // update always fails.
+                            state = Updating;
+                            logPrint("Registration complete\n");
+                            break;
+                        case SseClock::Status::SPAM:
+                            state = Spam;
+                            break;
+                        case SseClock::Status::OTHER:
+                            delay = std::min(std::max(std::chrono::seconds{1}, delay * 2), kMaxRetryDelay);
+                            state = Delaying;
+                            break;
+                    }
+                    break;
+                case Updating:
+                    switch (clock.checked<&SseClock::send_event>()) {
+                        case SseClock::Status::OK:
+                            resetDelay();
+                            state = Waiting;
+                            break;
+                        case SseClock::Status::SPAM:
+                            state = Spam;
+                            break;
+                        case SseClock::Status::OTHER:
+                            state = Registering;
+                            break;
+                    }
+                    break;
+                case Waiting: {
+                    auto wait = std::chrono::ceil<std::chrono::seconds>(std::chrono::steady_clock::now());
+                    std::this_thread::sleep_until(wait);
+                    state = Updating;
+                    break;
+                }
+                case Delaying: {
+                    if (next_request < std::chrono::steady_clock::now()) {
+                        next_request = std::chrono::steady_clock::now() + delay;
+                        logPrint("Delaying by {:%Mm%Ss} (@{:%H:%M:%S})\n", delay, std::chrono::system_clock::now() + delay);
+                    }
+
+                    // Sleep only for a short time so that
+                    // 1. we can check if the situation with SSE changed (i.e. was restarted)
+                    // 2. check if we were requested to quit
+                    auto wait = std::chrono::ceil<std::chrono::seconds>(std::chrono::steady_clock::now());
+                    std::this_thread::sleep_until(wait);
+
+                    if (clock.checkAddress()) {
+                        // The address changed, SSE was restarted so reset the delay
                         resetDelay();
-                        state = Waiting;
-                        break;
-                    case SseClock::Status::SPAM:
-                        state = Spam;
-                        break;
-                    case SseClock::Status::OTHER:
-                        state = Registering;
-                        break;
+                        state = DelayedStart;
+                    } else {
+                        state = ((next_request <= std::chrono::steady_clock::now())
+                                        ? DelayedStart
+                                        : Delaying);
+                    }
+
+                    break;
                 }
-                break;
-            case Waiting: {
-                auto wait = std::chrono::ceil<std::chrono::seconds>(std::chrono::steady_clock::now());
-                std::this_thread::sleep_until(wait);
-                state = Updating;
-                break;
+                case Stopping:
+                    // Shouldn't be here
+                    logPrint("Unexpected state\n");
+                    std::terminate();
+                    break;
             }
-            case Delaying: {
-                if (next_request < std::chrono::steady_clock::now()) {
-                    next_request = std::chrono::steady_clock::now() + delay;
-                    logPrint("Delaying by {:%Mm%Ss} (@{:%H:%M:%S})\n", delay, std::chrono::system_clock::now() + delay);
-                }
-
-                // Sleep only for a short time so that
-                // 1. we can check if the situation with SSE changed (i.e. was restarted)
-                // 2. check if we were requested to quit
-                auto wait = std::chrono::ceil<std::chrono::seconds>(std::chrono::steady_clock::now());
-                std::this_thread::sleep_until(wait);
-
-                if (clock.checkAddress()) {
-                    // The address changed, SSE was restarted so reset the delay
-                    resetDelay();
-                    state = DelayedStart;
-                } else {
-                    state = ((next_request <= std::chrono::steady_clock::now())
-                                    ? DelayedStart
-                                    : Delaying);
-                }
-
-                break;
-            }
-            case Stopping:
-                // Shouldn't be here
-                logPrint("Unexpected state\n");
-                std::terminate();
-                break;
+        } catch (const std::exception &e) {
+            logPrint("Exception: {}\n", e.what());
+            delay = std::min(std::max(std::chrono::seconds{1}, delay * 2), kMaxRetryDelay);
+            state = Delaying;
         }
     }
     clock.remove();
