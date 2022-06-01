@@ -157,7 +157,7 @@ class SseClock {
             // File was modified at a future date, we can't estimate its age so
             // return something "old"
             auto future = age_date - std::chrono::steady_clock::now();
-            logPrint("Address file has a future date ({})", std::chrono::system_clock::now() + future);
+            logPrint("Address file has a future date ({})\n", std::chrono::system_clock::now() + future);
             age_date = kAncientDate;
         }
 
