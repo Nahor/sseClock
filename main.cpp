@@ -258,14 +258,15 @@ class SseClock {
     }
 
     Status send_event() {
+        SYSTEMTIME time;
+        GetLocalTime(&time);
+
         std::string date_str;
         {
-            SYSTEMTIME date;
-            GetSystemTime(&date);
             std::array<wchar_t, 256> date_wstr{};
             GetDateFormatEx(LOCALE_NAME_USER_DEFAULT,
                     DATE_AUTOLAYOUT | DATE_SHORTDATE,
-                    &date,
+                    &time,
                     nullptr,
                     date_wstr.data(),
                     date_wstr.size(),
