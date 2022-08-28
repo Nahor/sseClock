@@ -132,7 +132,7 @@ class SseClock {
         }
 
         if (sse_address_ != new_addr) {
-            logPrint("Using address: {}\n", sse_address_);
+            logPrint("Using address: {}\n", new_addr);
             sse_address_ = new_addr;
             return true;
         }
