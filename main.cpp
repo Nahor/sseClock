@@ -1,15 +1,18 @@
 #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 #define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
 
 #include <cpr/cpr.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/os.h>
+#include <windows.h>
 #include <chrono>
 #include <codecvt>
 #include <csignal>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <thread>  // for std::this_thread::sleep_until
@@ -25,6 +28,7 @@ static constexpr const char *kSseEventId = "CLOCK";
 
 static constexpr const char *kAddrError = "<addr error>";
 
+static constexpr std::chrono::milliseconds kHttpTimeout = std::chrono::milliseconds{500};
 static constexpr std::chrono::seconds kMaxRetryDelay = std::chrono::minutes{5};
 static constexpr std::chrono::seconds kMinAddressAge = std::chrono::seconds{3};
 static constexpr std::chrono::seconds kSpamDelay = std::chrono::seconds{320};
@@ -121,7 +125,7 @@ class SseClock {
             new_addr = "http://" + sse_prop["address"].get<std::string>();
         } catch (const nlohmann::json::exception &e) {
             if (sse_address_ != kAddrError) {
-                logPrint("JSON exception in address file: {}\n", e.what());
+                logPrint("Invalid JSON in SSE config file: {}\n", e.what());
                 sse_address_ = kAddrError;
             }
             return false;
@@ -169,7 +173,7 @@ class SseClock {
                 cpr::Url{sse_address_ + path},
                 cpr::Header{{"Content-Type", "application/json"}},
                 cpr::Body(body.dump()),
-                cpr::Timeout{500});
+                cpr::Timeout{kHttpTimeout});
         if (response.error.code != cpr::ErrorCode::OK) {
             if (!silent) {
                 logPrint("Error[{}]: {} - {}\n", path, static_cast<int>(response.error.code), response.error.message);
@@ -199,7 +203,7 @@ class SseClock {
                 return Status::SPAM;
             }
         } catch (const nlohmann::json::exception &e) {
-            logPrint("JSON exception in request:\n\t{}\nin body:\n", e.what(), response.text);
+            logPrint("Invalid JSON in response:\n\t{}\nin body:\n\t{}\n", e.what(), response.text);
         }
         return Status::OTHER;
     }
