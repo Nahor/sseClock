@@ -2,10 +2,10 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 
-#include <cpr/cpr.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/os.h>
+#include <httplib.h>
 #include <windows.h>
 #include <chrono>
 #include <codecvt>
@@ -169,19 +169,19 @@ class SseClock {
     }
 
     Status sendRequest(const char *path, const nlohmann::json &body, bool silent = false) {
-        cpr::Response response = cpr::Post(
-                cpr::Url{sse_address_ + path},
-                cpr::Header{{"Content-Type", "application/json"}},
-                cpr::Body(body.dump()),
-                cpr::Timeout{kHttpTimeout});
-        if (response.error.code != cpr::ErrorCode::OK) {
+        httplib::Client client{sse_address_};
+        client.set_connection_timeout(kHttpTimeout);
+        client.set_read_timeout(kHttpTimeout);
+        client.set_write_timeout(kHttpTimeout);
+        httplib::Result response = client.Post(std::string(path) + "foo", body.dump(), "application/json");
+        if (response.error() != httplib::Error::Success) {
             if (!silent) {
-                logPrint("Error[{}]: {} - {}\n", path, static_cast<int>(response.error.code), response.error.message);
+                logPrint("Error[{}]: {}\n", path, httplib::to_string(response.error()));
             }
             return Status::OTHER;
         }
 
-        if (response.status_code == 200) {
+        if (response->status == 200) {
             return Status::OK;
         }
 
@@ -193,17 +193,17 @@ class SseClock {
 
         // Log the error and delay the next request
         logPrint("Url: {}\n", (sse_address_ + path));
-        logPrint("   Status code: {} - {}\n", response.status_code, response.status_line);
-        logPrint("   Content-type: {}\n", response.header["content-type"]);
-        logPrint("   Body: {} \n", response.text);
+        logPrint("   Status code: {} - {}\n", response->status, response->reason);
+        logPrint("   Content-type: {}\n", response->get_header_value("content-type"));
+        logPrint("   Body: {} \n", response->body);
 
         try {
-            nlohmann::json response_body = nlohmann::json::parse(response.text);
+            nlohmann::json response_body = nlohmann::json::parse(response->body);
             if (response_body.contains("error") && (response_body["error"] == kErrorTooManyRegistration)) {
                 return Status::SPAM;
             }
         } catch (const nlohmann::json::exception &e) {
-            logPrint("Invalid JSON in response:\n\t{}\nin body:\n\t{}\n", e.what(), response.text);
+            logPrint("Invalid JSON in response:\n\t{}\nin body:\n\t{}\n", e.what(), response->body);
         }
         return Status::OTHER;
     }

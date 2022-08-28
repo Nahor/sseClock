@@ -5,6 +5,7 @@
         "datas",
         "DATE_AUTOLAYOUT",
         "DATE_SHORTDATE",
+        "httplib",
         "nlohmann",
         "NOLINTNEXTLINE",
         "NOMINMAX",
