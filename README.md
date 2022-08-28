@@ -33,8 +33,8 @@ Add the generated application to your startup directory.
 
 ### Stopping
 
-* From a terminal, use `Ctrl+C`
-* When launch from Windows Explorer or automatically during boot, kill the app
+* When started from a terminal, use `Ctrl+C`
+* When launched from Windows Explorer or automatically during boot, kill the app
   using the Task Manager
 
 ## Logs
@@ -48,8 +48,9 @@ In case of issues, logs are located in the temporary directory:
 
 ## Notes
 
-SteelSeries Engine is full of race conditions. This can cause some delays when
+~~SteelSeries Engine is full of race conditions. This can cause some delays when
 starting sseClock. In particular, at boot, it can take up to 5 min for it work
 because SSE believes sseClock is spamming it after one failed attempt to
 connect (`Events for too many games have been registered recently, please try
-again later`). The SteelSeries people are [aware of it](https://github.com/SteelSeries/gamesense-sdk/issues/124).
+again later`). The SteelSeries people are [aware of it](https://github.com/SteelSeries/gamesense-sdk/issues/124).~~
+_[Fixed as of SteelSeries Engine 20.0.0]_
