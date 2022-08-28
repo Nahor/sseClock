@@ -72,6 +72,12 @@ set(CURL_DISABLE_TFTP ON CACHE INTERNAL "")
 set(CURL_DISABLE_OPENSSL_AUTO_LOAD_CONFIG ON CACHE INTERNAL "")
 
 # CPR options
+if (POLICY CMP0135)
+    # CPR downloads a cUrl archive resulting in the warning about policy CMP0135.
+    # However, if we use cmake_policy(...), we still get that warning. So change
+    # the default instead
+    set(CMAKE_POLICY_DEFAULT_CMP0135 NEW)
+endif()
 set(CPR_ENABLE_SSL OFF CACHE INTERNAL "")
 set(CURL_ZLIB OFF CACHE INTERNAL "")
 FetchContent_Declare(cpr
