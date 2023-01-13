@@ -67,8 +67,11 @@ static constexpr const char *kErrorUnknownGame = "That game is not registered";
 // NOLINTNEXTLINE(concurrency-mt-unsafe)
 static const char *const tmpPath = std::getenv("TMP");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+static bool hasConsole = false;
+
 template <typename... Args>
-void logPrint(Args &&...args) {
+void logFile(Args &&...args) {
     std::filesystem::path log_path = tmpPath;
     log_path.append(kLogRpath);
     log_path = log_path.lexically_normal().make_preferred();
@@ -94,6 +97,20 @@ void logPrint(Args &&...args) {
     fmt::ostream log_stream = fmt::output_file(log_path.string(), fmt::file::APPEND | fmt::file::WRONLY);
     log_stream.print("{} - ", std::chrono::system_clock::now());
     log_stream.print(std::forward<Args>(args)...);
+}
+
+template <typename... Args>
+void logConsole(Args &&...args) {
+    if (hasConsole) {
+        fmt::print("{} - ", std::chrono::system_clock::now());
+        fmt::print(std::forward<Args>(args)...);
+    }
+}
+
+template <typename... Args>
+void logPrint(Args &&...args) {
+    logFile(std::forward<Args>(args)...);
+    logConsole(std::forward<Args>(args)...);
 }
 
 class SseClock {
@@ -387,28 +404,29 @@ int main(int /*argc*/, char * /*argv*/[]) {
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
 
-    logPrint("=== Application start ===\n");
+    logFile("=== Application start ===\n");
 
-    // if (AttachConsole(ATTACH_PARENT_PROCESS) == TRUE) {
-    //     logPrint("Attaching to parent console\n");
-    //     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-    //     std::freopen("CON", "r", stdin);
-    //     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-    //     std::freopen("CON", "w", stdout);
-    //     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
-    //     std::freopen("CON", "w", stderr);
+    hasConsole = (AttachConsole(ATTACH_PARENT_PROCESS) == TRUE);
+    if (hasConsole) {
+        logConsole("Attaching to parent console\n");
+        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+        std::freopen("CON", "r", stdin);
+        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+        std::freopen("CON", "w", stdout);
+        // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
+        std::freopen("CON", "w", stderr);
 
-    //     if (SetConsoleCtrlHandler(ctrlHandler, TRUE) == 0) {
-    //         logPrint("Failed to attach Ctrl handler\n");
-    //         fmt::print("Failed to attach Ctrl handler\n");
-    //     }
-    // } else {
-    //     logPrint("No parent console\n");
-    // }
+        if (SetConsoleCtrlHandler(ctrlHandler, TRUE) == 0) {
+            logPrint("Failed to attach Ctrl handler\n");
+        }
+    } else {
+        logFile("No parent console\n");
+    }
     // Hide Windows' console
-    ShowWindow(GetConsoleWindow(), 0);
+    // fmt::print("Console: {}\n", static_cast<void*>(GetConsoleWindow()));
+    // fmt::print("Hiding: {}\n", ShowWindowAsync(GetConsoleWindow(), SW_HIDE));
 
-    fmt::print("Logging to {}\n", tmpPath);
+    logConsole("Logging to {}\n", tmpPath);
 
     SseClock clock;
 
@@ -553,7 +571,7 @@ int main(int /*argc*/, char * /*argv*/[]) {
     }
     clock.remove();
 
-    logPrint("=== Application shutting down ===\n");
+    logFile("=== Application shutting down ===\n");
 
     return 0;
 }
