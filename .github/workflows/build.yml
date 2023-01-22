@@ -1,0 +1,53 @@
+name: Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # - { icon: '⬛', sys: mingw32 }  # doesn't compile, didn't bother checking why
+          - { icon: '🟦', sys: mingw64 }
+          - { icon: '🟨', sys: ucrt64  }
+          # - { icon: '🟧', sys: clang64 }   # there is some compilation errors related to formatting std::chrono
+    name: '${{ matrix.icon }} ${{ matrix.sys }}'
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+
+    - name: '${{ matrix.icon }} Setup MSYS2'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: ${{matrix.sys}}
+        update: true
+        install: >-
+          git
+          make
+        pacboy: >-
+          toolchain:p
+          cmake:p
+          ninja:p
+
+    - name: 'Checkout'
+      uses: actions/checkout@v3
+
+    - name: Configure CMake
+      run: cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build
+      run: cmake --build build
+
+    # - name: Strip
+    #   run: strip build/sseClock.exe

@@ -1,5 +1,7 @@
 # sseClock
 
+[![Build status](https://github.com/Nahor/sseClock/actions/workflows/build.yml/badge.svg)](https://github.com/Nahor/sseClock/actions/workflows/build.yml)
+
 Simple application for SteelSeries with OLED/LED display to show the current
 date and time.
 ![Screenshot](/img/screenshot.jpg)

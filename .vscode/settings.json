@@ -5,11 +5,16 @@
         "datas",
         "DATE_AUTOLAYOUT",
         "DATE_SHORTDATE",
+        "DCMAKE",
+        "MSYS2",
+        "msystem",
         "nlohmann",
         "NOLINTNEXTLINE",
         "NOMINMAX",
         "nullopt_t",
-        "timepoint"
+        "pacboy",
+        "timepoint",
+        "ucrt64"
     ],
     "cmake.generator": "Ninja"
 }
