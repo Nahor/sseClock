@@ -1,3 +1,5 @@
+// See comment about `clippy::large_enum_variant` is error.rs
+#![allow(clippy::result_large_err)]
 // spell-checker:words chrono condvar datas nanos subsec thiserror unregistering ureq
 mod error;
 mod logger;
@@ -66,11 +68,7 @@ pub struct SseClock {
 }
 impl SseClock {
     pub fn new() -> Self {
-        SseClock {
-            notify: Arc::new((Mutex::new(false), Condvar::new())),
-            address: String::default(),
-            stopping: Arc::new(AtomicBool::new(false)),
-        }
+        Self::default()
     }
 
     pub fn get_stop_notify(&self) -> StopNotify {
@@ -111,7 +109,7 @@ impl SseClock {
             .ok_or(SSEError::NoStringAddress)?;
 
         if self.address != addr {
-            self.address = addr.to_owned();
+            addr.clone_into(&mut self.address);
             info!("Using address: {}", self.address);
         }
         Ok(&self.address)
@@ -183,7 +181,7 @@ impl SseClock {
         let response = self.send_remove();
         match response {
             Ok(_) => Ok(()),
-            Err(SSEError::HttpError(ureq::Error::Status(status, _))) if status == 400 => Ok(()),
+            Err(SSEError::HttpError(ureq::Error::Status(400, _))) => Ok(()),
             Err(err) => Err(err),
         }?;
 
@@ -239,8 +237,7 @@ impl SseClock {
             Err(err) => error!("File watch error: {:?}", err),
         })?;
         watcher.watch(
-            &self
-                .get_sse_config_path()?
+            self.get_sse_config_path()?
                 .parent()
                 .expect("No directory for SSE config"),
             RecursiveMode::Recursive,
@@ -320,5 +317,15 @@ impl SseClock {
         }
 
         Ok(())
+    }
+}
+
+impl Default for SseClock {
+    fn default() -> Self {
+        SseClock {
+            notify: Arc::new((Mutex::new(false), Condvar::new())),
+            address: String::default(),
+            stopping: Arc::new(AtomicBool::new(false)),
+        }
     }
 }

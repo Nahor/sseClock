@@ -4,6 +4,9 @@ use thiserror::Error;
 
 pub type SSEResult<T> = Result<T, SSEError>;
 
+// ureq::Error is large, but the size is not critical, and using a `Box` would
+// prevent pattern matching. Revisit once the deref_patterns feature is stabilized
+#[allow(clippy::large_enum_variant)]
 #[derive(Error, Debug)]
 pub enum SSEError {
     #[error("No ProgramData environment variable")]

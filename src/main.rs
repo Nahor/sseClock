@@ -9,7 +9,7 @@ use tray_item::{IconSource, TrayItem};
 
 use sse_clock::{SseClock, SseLogger, StopNotify};
 
-static LOGGER: Lazy<SseLogger> = Lazy::new(|| SseLogger::new());
+static LOGGER: Lazy<SseLogger> = Lazy::new(SseLogger::new);
 
 enum Message {
     Exit,
@@ -57,12 +57,12 @@ fn tray_loop(tx: SyncSender<Message>, rx: Receiver<Message>, tray_stop: StopNoti
     })
     .expect("Failed to create Exit menu item");
 
-    loop {
-        match rx.recv() {
-            Ok(Message::Exit) => {
-                break;
-            }
-            _ => {}
+    // Currently, all results lead to exiting. If we add new types of messages
+    // we may need to add a loop
+    match rx.recv() {
+        Ok(Message::Exit) => {}
+        Err(err) => {
+            warn!("{err:?}");
         }
     }
 

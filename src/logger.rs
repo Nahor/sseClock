@@ -1,5 +1,4 @@
 // spell-checker:words chrono
-use log;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::{env, fs};
@@ -27,33 +26,7 @@ impl SseLogger {
 
 impl SseLogger {
     pub fn new() -> Self {
-        let level = env::var("RUST_LOG")
-            .ok()
-            .and_then(|level_str| level_str.parse().ok())
-            .unwrap_or(log::LevelFilter::Info);
-        let has_console = unsafe { AttachConsole(0xFFFFFFFF).is_ok() };
-
-        let file_path: Option<PathBuf>;
-        let bak_path: Option<PathBuf>;
-
-        if let Ok(path) = env::var("TMP") {
-            file_path = Some([&path, &LOG_PATH.to_owned()].iter().collect::<PathBuf>());
-            bak_path = Some(
-                [&path, &LOG_PATH_BAK.to_owned()]
-                    .iter()
-                    .collect::<PathBuf>(),
-            );
-        } else {
-            file_path = None;
-            bak_path = None;
-        }
-
-        Self {
-            level,
-            has_console,
-            file_path,
-            bak_path,
-        }
+        Self::default()
     }
 
     fn log_console(&self, log: &str) {
@@ -112,6 +85,38 @@ impl SseLogger {
             .format("%Y-%m-%d %H:%M:%S.%3f")
             .to_string();
         format!("[{} - {:<5} {}]", now, record.level(), record.target())
+    }
+}
+
+impl Default for SseLogger {
+    fn default() -> Self {
+        let level = env::var("RUST_LOG")
+            .ok()
+            .and_then(|level_str| level_str.parse().ok())
+            .unwrap_or(log::LevelFilter::Info);
+        let has_console = unsafe { AttachConsole(0xFFFFFFFF).is_ok() };
+
+        let file_path: Option<PathBuf>;
+        let bak_path: Option<PathBuf>;
+
+        if let Ok(path) = env::var("TMP") {
+            file_path = Some([&path, &LOG_PATH.to_owned()].iter().collect::<PathBuf>());
+            bak_path = Some(
+                [&path, &LOG_PATH_BAK.to_owned()]
+                    .iter()
+                    .collect::<PathBuf>(),
+            );
+        } else {
+            file_path = None;
+            bak_path = None;
+        }
+
+        Self {
+            level,
+            has_console,
+            file_path,
+            bak_path,
+        }
     }
 }
 
