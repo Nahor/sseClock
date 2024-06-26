@@ -9,6 +9,7 @@ date and time.
 ## Build/Compilation
 
 *[**Note**: For the old C++ version, see the [main_cpp](https://github.com/Nahor/sseClock/tree/main_cpp) branch]*
+
 ### Building
 
 ```bash
@@ -48,4 +49,4 @@ starting sseClock. In particular, at boot, it can take up to 5 min for it work
 because SSE believes sseClock is spamming it after one failed attempt to
 connect (`Events for too many games have been registered recently, please try
 again later`). The SteelSeries people are [aware of it](https://github.com/SteelSeries/gamesense-sdk/issues/124).~~
-_[Fixed as of SteelSeries Engine 20.0.0]_
+*[Fixed as of SteelSeries Engine 20.0.0]*
