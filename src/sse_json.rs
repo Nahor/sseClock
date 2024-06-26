@@ -1,4 +1,3 @@
-// spell-checker:words datas
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]

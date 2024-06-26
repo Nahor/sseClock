@@ -1,0 +1,17 @@
+{
+    "version": "0.2",
+    "ignorePaths": [],
+    "dictionaryDefinitions": [],
+    "dictionaries": [],
+    "words": [
+        "chrono",
+        "Condvar",
+        "datas",
+        "nanos",
+        "subsec",
+        "thiserror",
+        "ureq"
+    ],
+    "ignoreWords": [],
+    "import": []
+}

@@ -1,4 +1,3 @@
-// spell-checker:words chrono
 use std::io::{Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::{env, fs};

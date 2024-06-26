@@ -1,4 +1,3 @@
-// spell-checker:words chrono
 #![windows_subsystem = "windows"]
 
 use std::sync::mpsc::{self, Receiver, SyncSender};

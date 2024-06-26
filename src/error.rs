@@ -1,4 +1,3 @@
-// spell-checker:words thiserror ureq
 use std::time;
 use thiserror::Error;
 
