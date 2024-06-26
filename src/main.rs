@@ -4,9 +4,11 @@ use std::sync::mpsc::{self, Receiver, SyncSender};
 
 use log::{info, warn};
 use once_cell::sync::Lazy;
+use sse_clock::{
+    logger::SseLogger,
+    see_clock::{SseClock, StopNotify},
+};
 use tray_item::{IconSource, TrayItem};
-
-use sse_clock::{SseClock, SseLogger, StopNotify};
 
 static LOGGER: Lazy<SseLogger> = Lazy::new(SseLogger::new);
 
