@@ -5,16 +5,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
-ctrlc = "3.4.2"
+chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
+ctrlc = "3.4.5"
 log = { version = "0.4.22", features = ["std"] }
-notify = { version = "6.1.1", default-features = false }
-serde = { version = "1.0.195", features = ["derive"] }
-serde_json = "1.0.111"
+# Git for updated Windows dependency (0.52 instead of 0.48)
+#notify = { version = "6.1.1", default-features = false }
+notify = { git = "https://github.com/notify-rs/notify.git", rev = "146b1bd", default-features = false }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
 thiserror = "1.0.56"
 tray-item = "0.10.0"
-ureq = { version = "2.9.1", features = ["json"], default-features = false }
-windows = { version = "0.57.0", features = [
+ureq = { version = "2.10.1", features = ["json"], default-features = false }
+windows = { version = "0.58.0", features = [
     "Win32_System_Console",
     "Win32_Foundation",
 ] }
