@@ -11,6 +11,7 @@ use tray_item::{IconSource, TrayItem};
 
 enum Message {
     Exit,
+    Done,
 }
 fn main() {
     let logger = Box::new(SseLogger::new());
@@ -29,7 +30,8 @@ fn main() {
     let tray_stop = sse_clock.get_stop_notify();
 
     ctrlc::set_handler(move || {
-        info!("Received terminate event");
+        info!("Received Ctrl-C event");
+        // Notify the SSE clock thread to stop
         ctrlc_stop.stop();
     })
     .expect("Unable to set terminate handler");
@@ -58,17 +60,17 @@ fn tray_loop(tx: SyncSender<Message>, rx: Receiver<Message>, tray_stop: StopNoti
     })
     .expect("Failed to create Exit menu item");
 
-    // Currently, all results lead to exiting. If we add new types of messages
-    // we may need to add a loop
-    match rx.recv() {
-        Ok(Message::Exit) => {}
-        Err(err) => {
-            warn!("{err:?}");
+    while let Ok(msg) = rx.recv() {
+        match msg {
+            Message::Exit => {
+                info!("Received menu Exit event");
+                // Notify the SSE clock thread to stop
+                tray_stop.stop();
+            }
+
+            Message::Done => break, // SSE clock thread is done => terminate tray thread
         }
     }
-
-    // notify the SSE clock thread to stop
-    tray_stop.stop();
 }
 
 fn sse_loop(mut sse_clock: SseClock, tx: SyncSender<Message>) {
@@ -77,6 +79,6 @@ fn sse_loop(mut sse_clock: SseClock, tx: SyncSender<Message>) {
     }
 
     // Notify the tray thread to stop
-    tx.send(Message::Exit)
+    tx.send(Message::Done)
         .expect("Failed to send Exit message from SSE loop");
 }
