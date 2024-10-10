@@ -7,9 +7,8 @@ edition = "2021"
 [dependencies]
 chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
 ctrlc = "3.4.2"
-log = "0.4.20"
+log = { version = "0.4.22", features = ["std"] }
 notify = { version = "6.1.1", default-features = false }
-once_cell = "1.19.0"
 serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.111"
 thiserror = "1.0.56"

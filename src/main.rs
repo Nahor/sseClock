@@ -3,23 +3,23 @@
 use std::sync::mpsc::{self, Receiver, SyncSender};
 
 use log::{info, warn};
-use once_cell::sync::Lazy;
 use sse_clock::{
     logger::SseLogger,
     see_clock::{SseClock, StopNotify},
 };
 use tray_item::{IconSource, TrayItem};
 
-static LOGGER: Lazy<SseLogger> = Lazy::new(SseLogger::new);
-
 enum Message {
     Exit,
 }
 fn main() {
-    let _ = log::set_logger(&*LOGGER).map(|()| log::set_max_level(LOGGER.get_level()));
+    let logger = Box::new(SseLogger::new());
+    let logger_info = format!("{logger:?}").to_string();
+    log::set_max_level(logger.get_level());
+    let _ = log::set_boxed_logger(logger);
 
     info!("App starting");
-    info!("logger: {:?}", *LOGGER);
+    info!("logger: {}", logger_info);
 
     let (tx, rx) = mpsc::sync_channel(1);
     let tx_sse_loop = tx.clone();
