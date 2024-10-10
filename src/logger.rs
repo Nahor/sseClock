@@ -34,7 +34,7 @@ impl SseLogger {
         }
     }
 
-    fn log_file(&self, header: &str, log: &str) {
+    fn log_file(&self, prefix: &str, log: &str) {
         let Some(path) = &self.file_path else { return };
 
         // If the log file exists and is too big, move it (or truncate if it can't be move)
@@ -42,7 +42,7 @@ impl SseLogger {
             if meta.len() >= MAX_LOG_SIZE {
                 // Try to append the "footer"
                 if let Ok(mut file) = fs::File::options().append(true).open(path) {
-                    let _ = file.write_all(format!("{header} - Log rotation\n").as_bytes());
+                    let _ = file.write_all(format!("{prefix} - Log rotation\n").as_bytes());
                 }
                 // Move or truncate
                 if !self
@@ -63,13 +63,13 @@ impl SseLogger {
 
         if let Ok(pos) = file.seek(SeekFrom::End(0)) {
             if pos == 0 {
-                let _ = file.write_all(format!("{header} - Log start\n").as_bytes());
+                let _ = file.write_all(format!("{prefix} - Log start\n").as_bytes());
             }
         }
         let _ = file.write_all(format!("{}\n", log).as_bytes());
     }
 
-    fn header(&self, record: &log::Record) -> String {
+    fn prefix(&self, record: &log::Record) -> String {
         let now = chrono::Local::now()
             .format("%Y-%m-%d %H:%M:%S.%3f")
             .to_string();
@@ -119,10 +119,10 @@ impl log::Log for SseLogger {
         if !self.enabled(record.metadata()) {
             return;
         }
-        let header = self.header(record);
-        let str = format!("{} {}", header, record.args());
+        let prefix = self.prefix(record);
+        let str = format!("{} {}", prefix, record.args());
         self.log_console(&str);
-        self.log_file(&header, &str);
+        self.log_file(&prefix, &str);
     }
 
     fn flush(&self) {
