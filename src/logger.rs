@@ -35,42 +35,32 @@ impl SseLogger {
     }
 
     fn log_file(&self, header: &str, log: &str) {
-        let path = match &self.file_path {
-            Some(path) => path,
-            None => return,
-        };
+        let Some(path) = &self.file_path else { return };
 
-        // If the log file exists and is too big, move (or delete it can't be move)
-        let mut file: Option<fs::File> = None;
+        // If the log file exists and is too big, move it (or truncate if it can't be move)
         if let Ok(meta) = fs::metadata(path) {
             if meta.len() >= MAX_LOG_SIZE {
+                // Try to append the "footer"
                 if let Ok(mut file) = fs::File::options().append(true).open(path) {
                     let _ = file.write_all(format!("{header} - Log rotation\n").as_bytes());
                 }
-                if let Some(bak_path) = &self.bak_path {
-                    let _ = fs::rename(path, bak_path);
+                // Move or truncate
+                if !self
+                    .bak_path
+                    .as_ref()
+                    .is_some_and(|bak_path| fs::rename(path, bak_path).is_ok())
+                {
+                    // Truncate
+                    let _ = fs::File::options().write(true).truncate(true).open(path);
                 }
-                // Create or truncate if we couldn't move it
-                file = fs::File::options()
-                    .write(true)
-                    .truncate(true)
-                    .create(true)
-                    .open(path)
-                    .ok();
-            }
-        }
-        // Create or append
-        file = file.or_else(|| {
-            fs::File::options()
-                .append(true)
-                .create(true)
-                .open(path)
-                .ok()
-        });
-        let mut file = match file {
-            Some(file) => file,
-            None => return,
+            };
         };
+
+        // Create or append
+        let Ok(mut file) = fs::File::options().append(true).create(true).open(path) else {
+            return;
+        };
+
         if let Ok(pos) = file.seek(SeekFrom::End(0)) {
             if pos == 0 {
                 let _ = file.write_all(format!("{header} - Log start\n").as_bytes());
