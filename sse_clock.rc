@@ -1,3 +1,0 @@
-// Generate icon from SVG using ImageMagick:
-//    magick -density 384 resources/sse_clock.svg -define icon:auto-resize -transparent white resources/sse_clock.ico
-exe-icon ICON "resources/sse_clock.ico"

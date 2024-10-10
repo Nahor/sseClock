@@ -1,5 +1,9 @@
+use winresource::WindowsResource;
+
 fn main() {
-    println!("cargo:rerun-if-changed=sse_clock.rc");
-    println!("cargo:rerun-if-changed=resources/sse_clock.ico");
-    embed_resource::compile("sse_clock.rc", embed_resource::NONE);
+    if std::env::var("CARGO_CFG_TARGET_OS").unwrap() == "windows" {
+        let mut res = WindowsResource::new();
+        res.set_icon_with_id("resources/sse_clock.ico", "exe-icon");
+        res.compile().unwrap();
+    }
 }

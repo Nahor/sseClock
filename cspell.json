@@ -10,7 +10,8 @@
         "nanos",
         "subsec",
         "thiserror",
-        "ureq"
+        "ureq",
+        "winresource"
     ],
     "ignoreWords": [],
     "import": []
