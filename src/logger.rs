@@ -45,10 +45,10 @@ impl SseLogger {
                     let _ = file.write_all(format!("{prefix} - Log rotation\n").as_bytes());
                 }
                 // Move or truncate
-                if !self
+                if self
                     .bak_path
                     .as_ref()
-                    .is_some_and(|bak_path| fs::rename(path, bak_path).is_ok())
+                    .is_none_or(|bak_path| fs::rename(path, bak_path).is_err())
                 {
                     // Truncate
                     let _ = fs::File::options().write(true).truncate(true).open(path);
