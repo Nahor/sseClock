@@ -6,8 +6,8 @@ use std::{
     env, fs,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Condvar, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -111,11 +111,18 @@ impl SseClock {
         Req: Serialize,
     {
         debug!("Request: {} {}", path, serde_json::to_string(&body)?);
+
+        let config = ureq::Agent::config_builder()
+            .timeout_global(Some(HTTP_TIMEOUT))
+            .build();
+        let agent: ureq::Agent = config.into();
+
         let address = format!("http://{}{}", self.get_sse_address()?, path);
-        let body = ureq::post(address.as_str())
-            .timeout(HTTP_TIMEOUT)
+        let body: String = agent
+            .post(address.as_str())
             .send_json(body)?
-            .into_string()?;
+            .body_mut()
+            .read_to_string()?;
         debug!("Response: {}", body);
         Ok(body)
     }
@@ -172,7 +179,7 @@ impl SseClock {
         let response = self.send_remove();
         match response {
             Ok(_) => Ok(()),
-            Err(SSEError::HttpError(ureq::Error::Status(400, _))) => Ok(()),
+            Err(SSEError::HttpError(ureq::Error::StatusCode(400))) => Ok(()),
             Err(err) => Err(err),
         }?;
 

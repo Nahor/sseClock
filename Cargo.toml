@@ -1,22 +1,20 @@
 [package]
 name = "sse_clock"
 version = "1.4.0"
-edition = "2021"
+edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 chrono = { version = "0.4.38", default-features = false, features = ["clock"] }
 ctrlc = "3.4.5"
 log = { version = "0.4.22", features = ["std"] }
-# Git for updated Windows dependency (0.52 instead of 0.48)
-#notify = { version = "6.1.1", default-features = false }
-notify = { git = "https://github.com/notify-rs/notify.git", rev = "146b1bd", default-features = false }
+notify = { version = "8.0.0", default-features = false }
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
-thiserror = "1.0.56"
+thiserror = "2.0.12"
 tray-item = "0.10.0"
-ureq = { version = "2.10.1", features = ["json"], default-features = false }
-windows = { version = "0.58.0", features = [
+ureq = { version = "3.0.10", features = ["json"], default-features = false }
+windows = { version = "0.61.1", features = [
     "Win32_System_Console",
     "Win32_Foundation",
 ] }
