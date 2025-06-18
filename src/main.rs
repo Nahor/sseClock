@@ -5,7 +5,7 @@ use std::sync::mpsc::{self, Receiver, SyncSender};
 use log::{info, warn};
 use sse_clock::{
     logger::SseLogger,
-    see_clock::{SseClock, StopNotify},
+    sse_clock::{SseClock, StopNotify},
 };
 use tray_item::{IconSource, TrayItem};
 
