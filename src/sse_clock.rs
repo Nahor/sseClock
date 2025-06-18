@@ -35,11 +35,11 @@ enum State {
     ErrorDelay,  // Waiting after an error
 }
 
-pub struct StopNotify {
+pub struct Notify {
     notify: Arc<(Mutex<bool>, Condvar)>,
     stopping: Arc<AtomicBool>,
 }
-impl StopNotify {
+impl Notify {
     pub fn stop(&self) {
         self.stopping.store(true, Ordering::Relaxed);
         self.notify();
@@ -62,8 +62,8 @@ impl SseClock {
         Self::default()
     }
 
-    pub fn get_stop_notify(&self) -> StopNotify {
-        StopNotify {
+    pub fn get_notify(&self) -> Notify {
+        Notify {
             notify: Arc::clone(&self.notify),
             stopping: Arc::clone(&self.stopping),
         }
@@ -227,7 +227,7 @@ impl SseClock {
     pub fn run(&mut self) -> Result<(), SSEError> {
         // Install filesystem watcher/notify to detect when the config file changes
         let mut watcher = {
-            let notify = self.get_stop_notify();
+            let notify = self.get_notify();
             notify::recommended_watcher(move |event| match event {
                 Ok(event) => {
                     info!("File watch event: {:?}", event);

@@ -5,7 +5,7 @@ use std::sync::mpsc::{self, Receiver, SyncSender};
 use log::{info, warn};
 use sse_clock::{
     logger::SseLogger,
-    sse_clock::{SseClock, StopNotify},
+    sse_clock::{Notify, SseClock},
 };
 use tray_item::{IconSource, TrayItem};
 
@@ -26,8 +26,8 @@ fn main() {
     let tx_sse_loop = tx.clone();
 
     let sse_clock = SseClock::new();
-    let ctrlc_stop = sse_clock.get_stop_notify();
-    let tray_stop = sse_clock.get_stop_notify();
+    let ctrlc_stop = sse_clock.get_notify();
+    let tray_stop = sse_clock.get_notify();
 
     ctrlc::set_handler(move || {
         info!("Received Ctrl-C event");
@@ -45,7 +45,7 @@ fn main() {
     info!("App done");
 }
 
-fn tray_loop(tx: SyncSender<Message>, rx: Receiver<Message>, tray_stop: StopNotify) {
+fn tray_loop(tx: SyncSender<Message>, rx: Receiver<Message>, tray_stop: Notify) {
     let mut tray = TrayItem::new("SSE Clock", IconSource::Resource("exe-icon"))
         .expect("Failed to create tray item");
     tray.add_label("SSE Clock")
