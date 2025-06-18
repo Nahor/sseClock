@@ -111,7 +111,7 @@ impl Default for SseLogger {
 
 impl log::Log for SseLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        (metadata.target() == "sse_clock" && metadata.level() <= self.level)
+        (metadata.target().starts_with("sse_clock") && metadata.level() <= self.level)
             || (metadata.level() <= log::Level::Warn)
     }
 
