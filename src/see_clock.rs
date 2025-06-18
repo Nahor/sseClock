@@ -226,14 +226,16 @@ impl SseClock {
 
     pub fn run(&mut self) -> Result<(), SSEError> {
         // Install filesystem watcher/notify to detect when the config file changes
-        let notify = self.get_stop_notify();
-        let mut watcher = notify::recommended_watcher(move |event| match event {
-            Ok(event) => {
-                debug!("File watch event: {:?}", event);
-                notify.notify();
-            }
-            Err(err) => error!("File watch error: {:?}", err),
-        })?;
+        let mut watcher = {
+            let notify = self.get_stop_notify();
+            notify::recommended_watcher(move |event| match event {
+                Ok(event) => {
+                    info!("File watch event: {:?}", event);
+                    notify.notify();
+                }
+                Err(err) => error!("File watch error: {:?}", err),
+            })?
+        };
         watcher.watch(
             self.get_sse_config_path()?
                 .parent()
