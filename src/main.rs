@@ -20,7 +20,7 @@ fn main() {
     let _ = log::set_boxed_logger(logger);
 
     info!("App starting");
-    info!("logger: {}", logger_info);
+    info!("logger: {logger_info}");
 
     let (tx, rx) = mpsc::sync_channel(1);
     let tx_sse_loop = tx.clone();

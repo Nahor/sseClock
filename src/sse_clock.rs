@@ -123,7 +123,7 @@ impl SseClock {
             .send_json(body)?
             .body_mut()
             .read_to_string()?;
-        debug!("Response: {}", body);
+        debug!("Response: {body}");
         Ok(body)
     }
 
@@ -230,10 +230,10 @@ impl SseClock {
             let notify = self.get_notify();
             notify::recommended_watcher(move |event| match event {
                 Ok(event) => {
-                    info!("File watch event: {:?}", event);
+                    info!("File watch event: {event:?}");
                     notify.notify();
                 }
-                Err(err) => error!("File watch error: {:?}", err),
+                Err(err) => error!("File watch error: {err:?}"),
             })?
         };
         watcher.watch(
@@ -303,7 +303,7 @@ impl SseClock {
                 }
                 State::ErrorDelay => {
                     error_delay = (error_delay * 2).clamp(MIN_RETRY_DELAY, MAX_RETRY_DELAY);
-                    info!("Delaying by {:?}", error_delay);
+                    info!("Delaying by {error_delay:?}");
                     self.wait(error_delay);
                     State::StartDelay
                 }

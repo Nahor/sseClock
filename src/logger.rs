@@ -66,7 +66,7 @@ impl SseLogger {
                 let _ = file.write_all(format!("{prefix} - Log start\n").as_bytes());
             }
         }
-        let _ = file.write_all(format!("{}\n", log).as_bytes());
+        let _ = file.write_all(format!("{log}\n").as_bytes());
     }
 
     fn prefix(&self, record: &log::Record) -> String {
